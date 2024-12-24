@@ -1,0 +1,83 @@
+function checkForDuplicates() {
+  const sheetNames = ['RDV16/12', 'RDV17/12', 'RDV30/12', 'RDV31/12', 'RDV06/01', 'RDV07/01','RDV13/01','RDV14/01']; // Modifiez les noms des feuilles
+  const masterSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('ALL'); // Modifiez si nécessaire
+  
+/*  let allData = [];
+  
+  sheetNames.forEach(sheetName => {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+    if (sheet) {
+      const data = sheet.getRange(1, 1, sheet.getLastRow(), 1).getValues(); // Colonne A
+      allData = allData.concat(data.flat());
+    }
+  });
+
+  // Supprime les doublons
+  const uniqueData = [...new Set(allData)];
+  const duplicateData = allData.filter(item => allData.indexOf(item) !== allData.lastIndexOf(item));
+
+  // Insère le résultat dans la feuille ALL
+  masterSheet.clear();
+  masterSheet.getRange(1, 1, uniqueData.length, 1).setValues(uniqueData.map(item => [item]));
+  masterSheet.getRange(1, 2, duplicateData.length, 1).setValues(duplicateData.map(item => [item]));
+}*/
+
+  // Vérification si la feuille 'ALL' existe
+  if (!masterSheet) {
+    throw new Error("La feuille 'ALL' n'existe pas. Veuillez la créer.");
+  }
+
+  let allData = []; // Initialise un tableau pour stocker toutes les adresses
+  let locationMap = {}; // Pour associer chaque adresse aux feuilles où elle apparaît
+
+  // Récupération des données de chaque feuille
+  sheetNames.forEach(sheetName => {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+    if (sheet) {
+      const data = sheet.getRange(1, 1, sheet.getLastRow(), 1).getValues(); // Récupère la colonne A
+      data.flat().forEach(item => {
+        if (item) { // Ignore les cellules vides
+          allData.push(item);
+          if (!locationMap[item]) {
+            locationMap[item] = []; // Initialise un tableau pour stocker les feuilles
+          }
+          locationMap[item].push(sheetName); // Ajoute le nom de la feuille
+        }
+      });
+    }
+  });
+
+  // Identification des doublons
+  const duplicates = allData.filter((item, index) => allData.indexOf(item) !== index && item !== "");
+  const uniqueDuplicates = [...new Set(duplicates)]; // Supprime les doublons des doublons
+
+  // Nettoyage de la feuille ALL
+  masterSheet.clear();
+
+  // Écriture des données principales (toutes les adresses) dans la colonne A
+  const allUniqueData = [...new Set(allData)].map(item => [item]); // Supprime les doublons pour affichage propre
+  if (allUniqueData.length > 0) {
+    masterSheet.getRange(1, 1, allUniqueData.length, 1).setValues(allUniqueData);
+  }
+
+  // Écriture des doublons à la fin avec les feuilles correspondantes
+  if (uniqueDuplicates.length > 0) {
+    const startRow = allUniqueData.length + 2; // Saute une ligne avant de lister les doublons
+    const duplicateDataWithSheets = uniqueDuplicates.map(item => [item, locationMap[item].join(', ')]); // Adresse et feuilles
+    masterSheet.getRange(startRow, 1, duplicateDataWithSheets.length, 2).setValues(duplicateDataWithSheets);
+    masterSheet.getRange(startRow, 1, duplicateDataWithSheets.length, 2).setBackground('#FFCCCC'); // Couleur rouge pour les doublons
+    masterSheet.getRange(startRow - 1, 1).setValue("DOUBLONS :").setFontWeight("bold"); // Titre pour la section des doublons
+  }
+
+  // Ajout d'une mise en forme conditionnelle pour les doublons dans le tableau principal
+  const range = masterSheet.getRange(1, 1, allUniqueData.length, 1); // Plage des données principales
+  const rules = SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied('=COUNTIF(A:A, A1) > 1') // Règle : Si une adresse est répétée
+    .setBackground('#00FF00') // Couleur verte pour les doublons
+    .setRanges([range])
+    .build();
+
+  const rulesSheet = masterSheet.getConditionalFormatRules(); // Récupère les règles existantes
+  rulesSheet.push(rules); // Ajoute la nouvelle règle
+  masterSheet.setConditionalFormatRules(rulesSheet); // Applique les règles mises à jour
+}
